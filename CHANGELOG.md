@@ -38,6 +38,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Only the app and its MCP server get an answer from the app's local service.** Other programs and web pages on the same computer get a refusal; an AI agent that is already connected continues to work
 - **A system proxy does not receive the app's data.** Search text, note text and book text stay on the computer when the computer uses a proxy
+- **Command keeps a note's text when a save fails.** It tries the save again, and asks before a different note or campaign opens over text that is not saved
+- **Text typed immediately before the app quits is saved.** This is also true when a tool's own window closes
+- **A rename does not replace a note that has the same name with its accents stored differently.** Command refuses the name, as it does for a name that is in use
 
 ## [4.3.0] - 2026-10-25
 

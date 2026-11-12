@@ -17,6 +17,7 @@ import json
 import os
 import re
 import tempfile
+import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 
@@ -92,6 +93,13 @@ def validate_name(name: str) -> str:
         shown = " ".join(c if ord(c) >= 32 else repr(c) for c in bad)
         raise Invalid(f"A name can't contain {shown}")
     return name
+
+
+def fold(name: str) -> str:
+    """``name`` as two names are compared: whatever its case, and whatever
+    its Unicode form. macOS takes "é" as one letter or as "e" and an accent
+    for the same file, so a name spelled the other way is the same name."""
+    return unicodedata.normalize("NFC", unicodedata.normalize("NFC", name).casefold())
 
 
 def _hidden(part: str) -> bool:
@@ -449,7 +457,7 @@ def scan(campaign: Path) -> dict:
     notes = [_entry(campaign, p) for p in _walk_clips(campaign)]
 
     def key(n: NoteEntry) -> tuple[str, str]:
-        return kind(n.path), n.name.casefold()
+        return kind(n.path), fold(n.name)
 
     seen: dict[tuple[str, str], int] = {}
     for n in notes:
@@ -479,14 +487,14 @@ def folder_notes(folder: Path) -> list[dict]:
 def _names_in_use(campaign: Path, of: str) -> set[str]:
     """The names the campaign's notes of kind ``of`` have, images among
     the notes."""
-    return {_name(p.name).casefold() for p in _walk_clips(campaign) if kind(_rel(campaign, p)) == of}
+    return {fold(_name(p.name)) for p in _walk_clips(campaign) if kind(_rel(campaign, p)) == of}
 
 
 def name_shared(campaign: Path, rel: str) -> bool:
     """Whether another note of any kind has the name of the one at ``rel``,
     as a beat named after its place does."""
-    name = _name(PurePosixPath(rel).name).casefold()
-    return sum(_name(p.name).casefold() == name for p in _walk_clips(campaign)) > 1
+    name = fold(_name(PurePosixPath(rel).name))
+    return sum(fold(_name(p.name)) == name for p in _walk_clips(campaign)) > 1
 
 
 def content_hash(data: bytes) -> str:
@@ -526,7 +534,7 @@ def clip_path(campaign: Path, rel: str) -> Path:
 def _image_names(campaign: Path) -> set[str]:
     """The names an image can't take: every image's in the campaign, since
     an embed names one by its file name, and every note's."""
-    return {p.name.casefold() for p in _walk(campaign, _is_image_file)} | _names_in_use(campaign, "note")
+    return {fold(p.name) for p in _walk(campaign, _is_image_file)} | _names_in_use(campaign, "note")
 
 
 def create_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
@@ -535,11 +543,15 @@ def create_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
     name = validate_name(name)
     if not _is_image_file(name):
         raise Invalid(f"Not an image: {name!r}")
-    if name.casefold() in _image_names(campaign):
+    if fold(name) in _image_names(campaign):
         raise Conflict(f"An image named {name!r} already exists in this campaign")
     parent = _folder(campaign, folder)
     _check_fits(campaign, parent, image=True)
     path = parent / name
+    # Whatever holds the name, an image outside the tracks included: the
+    # write below replaces what is there.
+    if os.path.lexists(path):
+        raise Conflict(f"{_rel(campaign, path)!r} already exists")
     atomic_write(path, data)
     return _rel(campaign, path)
 
@@ -554,7 +566,7 @@ def add_image(campaign: Path, folder: str, name: str, data: bytes) -> str:
     stem = stem.strip(" .")[:120].strip(" .") or "Image"
     taken = _image_names(campaign)
     candidate, n = f"{stem}{suffix}", 1
-    while candidate.casefold() in taken:
+    while fold(candidate) in taken:
         n += 1
         candidate = f"{stem} {n}{suffix}"
     return create_image(campaign, folder, candidate, data)
@@ -627,11 +639,14 @@ def create_note(campaign: Path, folder: str, name: str, content: str = "") -> st
     parent = _folder(campaign, folder)
     _check_fits(campaign, parent, image=False)
     of = kind(_rel(campaign, parent / f"{name}.md"))
-    if name.casefold() in _names_in_use(campaign, of):
+    if fold(name) in _names_in_use(campaign, of):
         raise Conflict(f"A {of} named {name!r} already exists in this campaign")
     path = parent / f"{name}.md"
-    with open(path, "xb") as f:
-        f.write(content.encode("utf-8"))
+    try:
+        with open(path, "xb") as f:
+            f.write(content.encode("utf-8"))
+    except FileExistsError:
+        raise Conflict(f"{_rel(campaign, path)!r} already exists") from None
     return _rel(campaign, path)
 
 
@@ -644,7 +659,7 @@ def free_name(campaign: Path, wanted: str) -> str:
     name = name.strip().strip(".").strip()[:120].strip() or "Untitled"
     taken = _names_in_use(campaign, "note")
     candidate, n = name, 1
-    while candidate.casefold() in taken:
+    while fold(candidate) in taken:
         n += 1
         candidate = f"{name} {n}"
     return candidate
@@ -687,7 +702,7 @@ def find_notes(campaign: Path, query: str, track: str | None = None, limit: int 
 
 def create_campaign(root: Path, name: str) -> str:
     name = validate_name(name)
-    if name.casefold() in {c.casefold() for c in list_campaigns(root)}:
+    if fold(name) in {fold(c) for c in list_campaigns(root)}:
         raise Conflict(f"A campaign named {name!r} already exists")
     campaign = root / name
     campaign.mkdir()
@@ -750,7 +765,7 @@ def open_untitled(root: Path) -> str:
     while True:
         name = UNTITLED if number == 1 else f"{UNTITLED} {number}"
         # A file blocks the name as well as a campaign does: mkdir would fail.
-        if not any(p.name.casefold() == name.casefold() for p in root.iterdir()):
+        if not any(fold(p.name) == fold(name) for p in root.iterdir()):
             return create_campaign(root, name)
         number += 1
 
@@ -784,8 +799,8 @@ def create_track(campaign: Path, name: str) -> str:
     name = validate_name(name)
     if _is_reserved(name):
         raise Invalid(f"{name!r} is reserved for Command's own notes")
-    taken = {p.name.casefold() for p in campaign.iterdir() if p.is_dir()}
-    if name.casefold() in taken:
+    taken = {fold(p.name) for p in campaign.iterdir() if p.is_dir()}
+    if fold(name) in taken:
         raise Conflict(f"A folder named {name!r} already exists in this campaign")
     # The order as displayed now, so the new track lands at its end rather
     # than wherever the alphabet puts it.
@@ -983,6 +998,21 @@ def _vault_parts(campaign: Path, rel: str) -> Parts:
     return (campaign.name, *parts[:-1], name)
 
 
+def _refuse_taken(src: Path, dst: Path, shown: str) -> None:
+    """The last check before a rename, which replaces what is at ``dst``:
+    refuse unless nothing is there, or it is ``src`` itself under another
+    spelling (a change of case or of Unicode form, where the file system
+    takes both spellings for one name)."""
+    if not os.path.lexists(dst):
+        return
+    try:
+        if os.path.samefile(src, dst):
+            return
+    except OSError:
+        pass
+    raise Conflict(f"{shown!r} already exists")
+
+
 def _relocate(campaign: Path, src: Path, dst: Path) -> list[tuple[Parts, Parts]]:
     """Rename ``src`` to ``dst`` (a note or a folder) and return the moves it
     made, one per note or image, for the link rewrite."""
@@ -992,6 +1022,7 @@ def _relocate(campaign: Path, src: Path, dst: Path) -> list[tuple[Parts, Parts]]
         olds = [_rel(campaign, src)]
     old_prefix = _rel(campaign, src)
     new_prefix = _rel(campaign, dst)
+    _refuse_taken(src, dst, _rel(campaign, dst))
     os.rename(src, dst)
     return [
         (_vault_parts(campaign, old), _vault_parts(campaign, new_prefix + old[len(old_prefix):]))
@@ -1000,7 +1031,7 @@ def _relocate(campaign: Path, src: Path, dst: Path) -> list[tuple[Parts, Parts]]
 
 
 def _same_name(a: str, b: str) -> bool:
-    return a.casefold() == b.casefold()
+    return fold(a) == fold(b)
 
 
 def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]]:
@@ -1015,7 +1046,7 @@ def rename_note(campaign: Path, rel: str, new_name: str) -> tuple[str, list[str]
     if new_name == old_name:
         return _rel(campaign, src), []
     of = kind(_rel(campaign, src))
-    if not _same_name(new_name, old_name) and new_name.casefold() in _names_in_use(campaign, of):
+    if not _same_name(new_name, old_name) and fold(new_name) in _names_in_use(campaign, of):
         raise Conflict(f"A {of} named {new_name!r} already exists in this campaign")
     dst = src.with_name(new_name if image else f"{new_name}.md")
     moves = _relocate(campaign, src, dst)
@@ -1044,7 +1075,7 @@ def move_note(campaign: Path, rel: str, folder: str, order: list[str] | None = N
     if _is_image_file(src.name) and to != "note":
         raise Invalid(f"An image goes in a track or on the shelf, not in {folder}/")
     _check_fits(campaign, parent, _is_image_file(src.name), src)
-    if to != kind(_rel(campaign, src)) and _name(src.name).casefold() in _names_in_use(campaign, to):
+    if to != kind(_rel(campaign, src)) and fold(_name(src.name)) in _names_in_use(campaign, to):
         raise Conflict(f"A {to} named {_name(src.name)!r} already exists in this campaign")
     if dst.exists():
         raise Conflict(f"{_rel(campaign, dst)!r} already exists")
@@ -1071,8 +1102,8 @@ def rename_track(campaign: Path, name: str, new_name: str) -> list[str]:
         raise Invalid(f"{new_name!r} is reserved for Command's own notes")
     if new_name == name:
         return []
-    taken = {p.name.casefold() for p in campaign.iterdir() if p.is_dir()}
-    if not _same_name(new_name, name) and new_name.casefold() in taken:
+    taken = {fold(p.name) for p in campaign.iterdir() if p.is_dir()}
+    if not _same_name(new_name, name) and fold(new_name) in taken:
         raise Conflict(f"A folder named {new_name!r} already exists in this campaign")
     order = [new_name if t == name else t for t in track_order(campaign)]
 
@@ -1109,12 +1140,11 @@ def rename_campaign(root: Path, name: str, new_name: str) -> list[str]:
     src = campaign_dir(root, name)
     if new_name == name:
         return []
-    if not _same_name(new_name, name) and new_name.casefold() in {
-        c.casefold() for c in list_campaigns(root)
-    }:
+    if not _same_name(new_name, name) and fold(new_name) in {fold(c) for c in list_campaigns(root)}:
         raise Conflict(f"A campaign named {new_name!r} already exists")
     rels = [_rel(src, p) for p in _walk(src, _is_linked_file)]
     dst = root / new_name
+    _refuse_taken(src, dst, new_name)
     os.rename(src, dst)
     moves = [((name, *_vault_parts(dst, r)[1:]), _vault_parts(dst, r)) for r in rels]
     return _rewrite_campaign(dst, moves)

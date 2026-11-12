@@ -321,9 +321,9 @@ def _folder(campaign: Path, track: str | None) -> str:
     first = next((t for t in vault.track_order(campaign) if kinds[t] == "encounter"), None)
     if first is not None:
         return first
-    taken = {p.name.casefold() for p in campaign.iterdir() if p.is_dir()}
+    taken = {vault.fold(p.name) for p in campaign.iterdir() if p.is_dir()}
     name, n = NAME, 1
-    while name.casefold() in taken:
+    while vault.fold(name) in taken:
         n += 1
         name = f"{NAME} {n}"
     made = vault.create_track(campaign, name)
@@ -334,11 +334,11 @@ def _folder(campaign: Path, track: str | None) -> str:
 def next_name(campaign: Path, track: str) -> str:
     """The track's name as written and a number, one more than the highest
     in a note's name of that shape, and free. No singular is worked out."""
-    taken = {n["name"].casefold() for n in vault.scan(campaign)["notes"]}
-    shape = re.compile(rf"{re.escape(track.casefold())} (\d+)")
+    taken = {vault.fold(n["name"]) for n in vault.scan(campaign)["notes"]}
+    shape = re.compile(rf"{re.escape(vault.fold(track))} (\d+)")
     numbers = [int(m.group(1)) for name in taken if (m := shape.fullmatch(name))]
     n = max(numbers, default=0) + 1
-    while f"{track} {n}".casefold() in taken:
+    while vault.fold(f"{track} {n}") in taken:
         n += 1
     return f"{track} {n}"
 

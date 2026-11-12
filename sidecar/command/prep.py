@@ -183,8 +183,8 @@ def create_session(campaign: Path) -> dict:
     current = index(campaign)
     numbers = [int(m.group()) for s in current["sessions"] if (m := re.search(r"\d+", s["name"]))]
     n = max(numbers, default=0) + 1
-    taken = {x["name"].casefold() for x in current["notes"]}
-    while f"Session {n}".casefold() in taken:
+    taken = {vault.fold(x["name"]) for x in current["notes"]}
+    while vault.fold(f"Session {n}") in taken:
         n += 1
     name = f"Session {n}"
 

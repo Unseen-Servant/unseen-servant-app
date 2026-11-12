@@ -52,6 +52,11 @@ export const commandApi = {
   readNote: (campaign: string, path: string) => invoke<Note>('command_read_note', { campaign, path }),
   saveNote: (campaign: string, path: string, content: string, baseHash: string) =>
     invoke<SaveOutcome>('command_save_note', { campaign, path, content, baseHash }),
+  /** The open note's text while it isn't on disk, for Rust to save if this
+   *  window closes or the app quits before the editor's own save lands;
+   *  null once there is none. `seq` orders the calls, which don't queue. */
+  holdNote: (seq: number, pending: { campaign: string; path: string; content: string; baseHash: string } | null) =>
+    invoke<void>('command_hold_note', { seq, pending }),
   createNote: (campaign: string, folder: string, name: string) =>
     invoke<string>('command_create_note', { campaign, folder, name }),
   renameNote: (campaign: string, path: string, newName: string) =>

@@ -5,6 +5,8 @@
 use reqwest::{RequestBuilder, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -31,6 +33,8 @@ pub const OPEN_ENCOUNTER_EVENT: &str = "foresight://open";
 const TIMEOUT: Duration = Duration::from_secs(30);
 /// Short: quitting waits on it, and a blank folder is all a timeout costs.
 const DISCARD_TIMEOUT: Duration = Duration::from_secs(2);
+/// Short as well: quitting waits on it, with the sidecar on the same machine.
+const HELD_TIMEOUT: Duration = Duration::from_secs(3);
 const RETRY_MIN: Duration = Duration::from_secs(1);
 const RETRY_MAX: Duration = Duration::from_secs(10);
 
@@ -160,6 +164,68 @@ pub struct Moved {
 pub enum SaveOutcome {
     Saved { hash: String },
     Conflict { hash: String },
+}
+
+/// The open note's text while it isn't on disk: what the editor would save
+/// next, with the hash it was loaded at.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HeldNote {
+    campaign: String,
+    path: String,
+    content: String,
+    base_hash: String,
+}
+
+/// What each window's editor hasn't saved yet (noteBuffer.ts `hold`). The
+/// editor saves after a pause in the typing, and a window can close, or the
+/// app quit, inside that pause: its webview is gone then, so the text is
+/// kept here and saved from here. By window label, with the `seq` of the
+/// call that set it, since two calls can land out of order.
+#[derive(Default)]
+pub struct HeldNotes(Mutex<HashMap<String, (u64, Option<HeldNote>)>>);
+
+impl HeldNotes {
+    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, (u64, Option<HeldNote>)>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Keep `pending` for `window`, or nothing once its text is on disk.
+    /// A call older than the one already kept is dropped.
+    fn hold(&self, window: &str, seq: u64, pending: Option<HeldNote>) {
+        let mut held = self.lock();
+        match held.get(window) {
+            Some((kept, _)) if *kept > seq => {}
+            _ => {
+                held.insert(window.to_string(), (seq, pending));
+            }
+        }
+    }
+
+    /// What `window` holds unsaved, and the call that set it.
+    fn of(&self, window: &str) -> Option<(u64, HeldNote)> {
+        match self.lock().get(window) {
+            Some((seq, Some(note))) => Some((*seq, note.clone())),
+            _ => None,
+        }
+    }
+
+    /// Let go of what `window` held at `seq`, unless it has held more since.
+    fn release(&self, window: &str, seq: u64) {
+        if let Some((kept, note)) = self.lock().get_mut(window) {
+            if *kept == seq {
+                *note = None;
+            }
+        }
+    }
+
+    /// Everything still held, taken from every window.
+    fn take_all(&self) -> Vec<HeldNote> {
+        self.lock()
+            .values_mut()
+            .filter_map(|(_, note)| note.take())
+            .collect()
+    }
 }
 
 /// What's live in one campaign: the beat it was launched from and the notes
@@ -592,18 +658,87 @@ pub async fn command_save_note(
     content: String,
     base_hash: String,
 ) -> Result<SaveOutcome, String> {
+    save_note(&campaign, &path, &content, &base_hash, TIMEOUT).await
+}
+
+async fn save_note(
+    campaign: &str,
+    path: &str,
+    content: &str,
+    base_hash: &str,
+    timeout: Duration,
+) -> Result<SaveOutcome, String> {
     let response = client()
         .put(api("/note"))
         .json(&serde_json::json!({
             "campaign": campaign, "path": path, "content": content, "base_hash": base_hash,
         }))
-        .timeout(TIMEOUT)
+        .timeout(timeout)
         .send()
         .await
         .map_err(|e| format!("Failed to connect to the sidecar: {}", e))?;
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
     save_outcome(status, &body)
+}
+
+/// The calling window's unsaved text, or `None` once it has none.
+#[tauri::command]
+pub fn command_hold_note(
+    window: tauri::WebviewWindow,
+    held: tauri::State<'_, HeldNotes>,
+    seq: u64,
+    pending: Option<HeldNote>,
+) {
+    held.hold(window.label(), seq, pending);
+}
+
+/// Save text a window held when it went. The sidecar takes it only over the
+/// file the editor loaded (`base_hash`), so a note that changed since, or
+/// that the editor's own last save reached first, is left as it is.
+async fn save_held(note: &HeldNote) {
+    let saved = save_note(
+        &note.campaign,
+        &note.path,
+        &note.content,
+        &note.base_hash,
+        HELD_TIMEOUT,
+    )
+    .await;
+    match saved {
+        Ok(SaveOutcome::Saved { .. }) => {}
+        Ok(SaveOutcome::Conflict { .. }) => eprintln!(
+            "Command: {} changed on disk, so the text its window held wasn't saved",
+            note.path
+        ),
+        Err(e) => eprintln!(
+            "Command: couldn't save the text held for {}: {}",
+            note.path, e
+        ),
+    }
+}
+
+/// A window is gone (a pop-out closed or docked): save what its editor
+/// hadn't. It stays held until the save returns, so a quit meanwhile still
+/// finds it (`save_all_held`).
+pub fn on_window_destroyed(app: &AppHandle, label: &str) {
+    let Some((seq, note)) = app.state::<HeldNotes>().of(label) else {
+        return;
+    };
+    let app = app.clone();
+    let label = label.to_string();
+    tauri::async_runtime::spawn(async move {
+        save_held(&note).await;
+        app.state::<HeldNotes>().release(&label, seq);
+    });
+}
+
+/// The app is quitting: save what every editor hadn't, before the sidecar
+/// stops.
+pub(crate) async fn save_all_held(app: &AppHandle) {
+    for note in app.state::<HeldNotes>().take_all() {
+        save_held(&note).await;
+    }
 }
 
 #[tauri::command]
@@ -1475,6 +1610,63 @@ mod tests {
         assert_eq!(err, Err("No campaign folder is set".to_string()));
         let err = save_outcome(StatusCode::NOT_FOUND, r#"{"detail":"Nothing at 'x.md'"}"#);
         assert_eq!(err, Err("Nothing at 'x.md'".to_string()));
+    }
+
+    fn held(content: &str) -> HeldNote {
+        HeldNote {
+            campaign: "Curse of Strahd".into(),
+            path: "NPCs/Ismark.md".into(),
+            content: content.into(),
+            base_hash: "abc".into(),
+        }
+    }
+
+    #[test]
+    fn a_held_note_reads_what_the_editor_sends() {
+        let sent = r#"{"campaign":"Curse of Strahd","path":"NPCs/Ismark.md","content":"Brother.","baseHash":"abc"}"#;
+        assert_eq!(
+            serde_json::from_str::<HeldNote>(sent).unwrap(),
+            held("Brother.")
+        );
+    }
+
+    #[test]
+    fn held_notes_keep_each_windows_latest_text_until_it_is_saved() {
+        let notes = HeldNotes::default();
+        assert_eq!(notes.of("main"), None);
+        notes.hold("main", 1, Some(held("one")));
+        notes.hold("main", 2, Some(held("two")));
+        notes.hold("panel-command", 7, Some(held("popped out")));
+        assert_eq!(notes.of("main"), Some((2, held("two"))));
+        // On disk now: the editor says so.
+        notes.hold("main", 3, None);
+        assert_eq!(notes.of("main"), None);
+        assert_eq!(notes.take_all(), vec![held("popped out")]);
+        assert_eq!(notes.take_all(), vec![]);
+    }
+
+    #[test]
+    fn held_notes_drop_a_call_that_lands_after_a_later_one() {
+        let notes = HeldNotes::default();
+        notes.hold("main", 5, Some(held("later")));
+        notes.hold("main", 4, Some(held("earlier")));
+        assert_eq!(notes.of("main"), Some((5, held("later"))));
+        notes.hold("main", 6, None);
+        notes.hold("main", 5, Some(held("later")));
+        assert_eq!(notes.of("main"), None);
+    }
+
+    #[test]
+    fn a_saved_held_note_is_released_unless_the_window_held_more_since() {
+        let notes = HeldNotes::default();
+        notes.hold("panel-command", 1, Some(held("one")));
+        notes.release("panel-command", 1);
+        assert_eq!(notes.of("panel-command"), None);
+
+        notes.hold("panel-command", 2, Some(held("two")));
+        notes.hold("panel-command", 3, Some(held("three")));
+        notes.release("panel-command", 2);
+        assert_eq!(notes.of("panel-command"), Some((3, held("three"))));
     }
 
     #[test]

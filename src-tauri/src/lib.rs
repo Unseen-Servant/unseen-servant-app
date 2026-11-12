@@ -645,6 +645,7 @@ pub fn run() {
             command::command_order_notes,
             command::command_read_note,
             command::command_save_note,
+            command::command_hold_note,
             command::command_create_note,
             command::command_rename_note,
             command::command_move_note,
@@ -717,6 +718,7 @@ pub fn run() {
             app.manage(SidecarFailureState(Mutex::new(None)));
             app.manage(boot::BootState::new());
             app.manage(app_context::AppContext::default());
+            app.manage(command::HeldNotes::default());
             app.manage(panels::PoppedPanels::default());
             // Losing the File menu is no reason not to start: log it.
             #[cfg(target_os = "macos")]
@@ -817,7 +819,10 @@ pub fn run() {
                     label,
                     event: tauri::WindowEvent::Destroyed,
                     ..
-                } => panels::on_window_destroyed(app_handle, &label),
+                } => {
+                    command::on_window_destroyed(app_handle, &label);
+                    panels::on_window_destroyed(app_handle, &label);
+                }
                 tauri::RunEvent::ExitRequested { api, code, .. } => {
                     // Some(_) is app.exit() (tray Quit or Cmd+Q) — let it proceed.
                     if code.is_none() {
@@ -835,6 +840,9 @@ pub fn run() {
                     }
                 }
                 tauri::RunEvent::Exit => {
+                    // What an editor hadn't saved yet, typed in the moment
+                    // before the quit. Before the sidecar stops.
+                    tauri::async_runtime::block_on(command::save_all_held(app_handle));
                     // A blank Untitled goes with the app, as it does when the
                     // GM switches away from it. Before the sidecar stops.
                     if let Some(campaign) = app_handle.state::<app_context::AppContext>().campaign()

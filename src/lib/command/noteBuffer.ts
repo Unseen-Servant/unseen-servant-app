@@ -4,14 +4,30 @@
 // a save whose hash no longer matches the disk; that refusal becomes a
 // conflict the GM resolves, never a silent overwrite.
 //
+// And text that isn't on disk is never dropped without a word: a save that
+// failed is tried again, and the buffer won't open another note or close
+// over it unless told to (`discard`), which the panel does only on the GM's
+// say. What it holds unsaved it also hands to `hold`, kept outside the
+// window, since a window can close before a save lands.
+//
 // Framework-free so the save rules are testable; the editor component feeds
 // it edits and applies the content it hands back.
 
 import type { Note, SaveOutcome } from './types';
 
+/** The open note's text while it isn't on disk. */
+export interface PendingNote {
+  path: string;
+  content: string;
+  baseHash: string;
+}
+
 export interface NoteIO {
   read(path: string): Promise<Note>;
   save(path: string, content: string, baseHash: string): Promise<SaveOutcome>;
+  /** Keep `pending` to save if the window goes first; null once the text
+   *  is on disk or given up. */
+  hold?(pending: PendingNote | null): void;
 }
 
 export type BufferStatus =
@@ -30,6 +46,9 @@ export interface BufferState {
 }
 
 export const SAVE_DELAY_MS = 600;
+/** How long after a save failed (the sidecar restarting, say) before the
+ *  next try. */
+export const RETRY_DELAY_MS = 3000;
 
 export class NoteBuffer {
   private path: string | null = null;
@@ -45,6 +64,7 @@ export class NoteBuffer {
   private unreadable: string | null = null;
   private error: string | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private held: PendingNote | null = null;
 
   constructor(
     private io: NoteIO,
@@ -64,25 +84,30 @@ export class NoteBuffer {
     return { path: this.path, status, error: this.unreadable ?? this.error };
   }
 
-  /** Open `path`, saving whatever is pending on the current note first. */
-  async open(path: string): Promise<void> {
-    await this.flush();
+  /** Open `path`, saving whatever is pending on the current note first.
+   *  False, with the current note still open, when its text couldn't be
+   *  saved: `discard` opens `path` anyway and gives that text up. */
+  async open(path: string, discard = false): Promise<boolean> {
+    if (!(await this.flush()) && !discard) return false;
     this.cancelTimer();
     this.path = path;
     this.conflicted = false;
     this.unreadable = this.error = null;
     await this.load(path);
+    return true;
   }
 
-  /** Close the note, saving what's pending first. */
-  async close(): Promise<void> {
-    await this.flush();
+  /** Close the note, saving what's pending first. False, with the note
+   *  still open, when its text couldn't be saved, unless `discard`. */
+  async close(discard = false): Promise<boolean> {
+    if (!(await this.flush()) && !discard) return false;
     this.cancelTimer();
     this.path = null;
     this.saved = this.current = this.baseHash = '';
     this.conflicted = false;
     this.unreadable = this.error = null;
     this.emit();
+    return true;
   }
 
   /** The editor's content changed. */
@@ -94,13 +119,23 @@ export class NoteBuffer {
     this.emit();
   }
 
-  /** Save now if anything is pending (switching notes, renaming, leaving). */
-  async flush(): Promise<void> {
+  /** Save now if anything is pending (switching notes, renaming, leaving).
+   *  Whether the editor's text is on disk afterwards: not when the save
+   *  failed, or while a conflict or a missing file keeps it from saving. */
+  async flush(): Promise<boolean> {
     this.cancelTimer();
-    if (this.saving) await this.saving;
-    if (this.path !== null && !this.conflicted && this.unreadable === null && this.current !== this.saved) {
+    for (;;) {
+      if (this.saving) await this.saving;
+      if (!this.savable()) break;
       await this.save();
+      // Typed during the save: once more, unless that save failed.
+      if (this.error !== null) break;
     }
+    return this.path === null || this.current === this.saved;
+  }
+
+  private savable(): boolean {
+    return this.path !== null && !this.conflicted && this.unreadable === null && this.current !== this.saved;
   }
 
   /** The open note now lives at `path` (renamed or moved by Command). Its
@@ -191,6 +226,7 @@ export class NoteBuffer {
       try {
         const outcome = await this.io.save(path, content, this.baseHash);
         if (this.path !== path) return;
+        this.error = null;
         if (outcome.status === 'saved') {
           this.baseHash = outcome.hash;
           this.saved = content;
@@ -210,7 +246,7 @@ export class NoteBuffer {
   }
 
   /** After a save: handle a disk change that arrived during it, or keep
-   *  saving edits typed while it was in flight. */
+   *  saving edits typed while it was in flight, or try a failed one again. */
   private async settle(path: string): Promise<void> {
     if (this.path !== path) return;
     if (this.recheck) {
@@ -218,17 +254,17 @@ export class NoteBuffer {
       await this.diskChanged();
       return;
     }
-    if (!this.conflicted && this.error === null && this.current !== this.saved) this.schedule();
+    if (this.savable()) this.schedule(this.error === null ? SAVE_DELAY_MS : RETRY_DELAY_MS);
     this.emit();
   }
 
-  private schedule(): void {
+  private schedule(delay = SAVE_DELAY_MS): void {
     this.cancelTimer();
     this.timer = setTimeout(() => {
       this.timer = null;
-      if (!this.saving) void this.save();
-      else this.schedule();
-    }, SAVE_DELAY_MS);
+      if (this.saving) this.schedule();
+      else if (this.savable()) void this.save();
+    }, delay);
   }
 
   private cancelTimer(): void {
@@ -237,6 +273,26 @@ export class NoteBuffer {
   }
 
   private emit(): void {
+    this.hold();
     this.onState(this.state);
+  }
+
+  /** Hand `io.hold` the unsaved text whenever it changes. A conflict's and
+   *  a missing file's too: the disk refuses them by their hash or path. */
+  private hold(): void {
+    if (!this.io.hold) return;
+    const pending =
+      this.path !== null && this.current !== this.saved
+        ? { path: this.path, content: this.current, baseHash: this.baseHash }
+        : null;
+    const was = this.held;
+    if (
+      pending === was ||
+      (pending && was && pending.path === was.path && pending.content === was.content && pending.baseHash === was.baseHash)
+    ) {
+      return;
+    }
+    this.held = pending;
+    this.io.hold(pending);
   }
 }

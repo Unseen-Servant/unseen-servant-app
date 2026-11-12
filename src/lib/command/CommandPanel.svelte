@@ -164,10 +164,15 @@
   let imageFailed = false;
   $: openImage, (imageFailed = false);
 
+  // Later than any call an earlier load of this window made.
+  let holdSeq = Date.now();
   const buffer = new NoteBuffer(
     {
       read: (path) => commandApi.readNote(campaign!, path),
       save: (path, content, baseHash) => commandApi.saveNote(campaign!, path, content, baseHash),
+      // Best effort: the editor's own save is what the GM is told about.
+      hold: (pending) =>
+        void commandApi.holdNote(++holdSeq, pending && campaign ? { campaign, ...pending } : null).catch(() => {}),
     },
     (state) => (bufState = state),
     (content) => {
@@ -266,8 +271,23 @@
     }
   }
 
+  /** Whether the open note can go: its text is on disk, or it couldn't be
+   *  saved (the sidecar is down, the file changed or went away) and the GM
+   *  gives it up. Asked before anything opens or closes over it. */
+  async function mayLeaveNote(): Promise<boolean> {
+    if (await buffer.flush()) return true;
+    return confirmPrompt.request({
+      title: m.command_panel_discard_title(),
+      rows: [{ label: m.command_panel_kind_note(), value: openName }],
+      message: m.command_panel_discard_message(),
+      confirmLabel: m.command_panel_discard(),
+      danger: true,
+    });
+  }
+
+  /** Callers ask `mayLeaveNote` first, unless the campaign itself is gone. */
   async function leaveCampaign() {
-    await buffer.close();
+    await buffer.close(true);
     openImage = null;
     campaign = null;
     index = null;
@@ -300,6 +320,12 @@
 
   async function enterCampaign(name: string | null) {
     if (name === campaign && index) return;
+    // The GM keeps a note that can't be saved: the workstation goes back
+    // to its campaign, in every window.
+    if (campaign && name !== campaign && campaigns.includes(campaign) && !(await mayLeaveNote())) {
+      await setCampaign(campaign);
+      return;
+    }
     await leaveCampaign();
     if (name && campaigns.includes(name)) {
       index = await commandApi.getCampaign(name);
@@ -546,7 +572,7 @@
     void unlisten?.then((stop) => stop());
     void unlistenLive?.then((stop) => stop());
     void unlistenOpen?.then((stop) => stop());
-    void buffer.close();
+    void buffer.close(true);
   });
 
   // -- paths --------------------------------------------------------------
@@ -564,14 +590,15 @@
   function openPath(path: string) {
     if (path === shown) return;
     run(async () => {
+      if (!(await mayLeaveNote())) return;
       if (IMAGE.test(path)) {
-        await buffer.close();
+        await buffer.close(true);
         openImage = path;
         return;
       }
       openImage = null;
       freshOpen = true;
-      await buffer.open(path);
+      await buffer.open(path, true);
     });
   }
 
@@ -582,12 +609,14 @@
 
   /** `[close]`: the note, saved first, or the image. */
   async function closeInspector() {
+    if (!(await mayLeaveNote())) return;
     openImage = null;
-    await buffer.close();
+    await buffer.close(true);
   }
 
   function createNote(folder: string, name: string) {
     run(async () => {
+      if (!(await mayLeaveNote())) return;
       const path = await commandApi.createNote(campaign!, folder, name);
       // A note started while a beat is armed lands in it.
       if (armedBeat) await commandApi.setMember(campaign!, armedBeat, path, true);
@@ -595,7 +624,7 @@
       selected = path;
       openImage = null;
       freshOpen = true;
-      await buffer.open(path);
+      await buffer.open(path, true);
       // A new note is empty: there's nothing to read yet.
       reading = false;
       await tick();
@@ -678,7 +707,7 @@
         danger: true,
       });
       if (!confirmed) return;
-      if (note.path === bufState.path) await buffer.close();
+      if (note.path === bufState.path) await buffer.close(true);
       if (note.path === openImage) openImage = null;
       await commandApi.trash(campaign!, note.path);
       await refreshIndex();
@@ -972,7 +1001,7 @@
         danger: true,
       });
       if (!confirmed) return;
-      if (bufState.path === target.path) await buffer.close();
+      if (bufState.path === target.path) await buffer.close(true);
       await commandApi.trash(campaign!, target.path);
       // Its board goes with it; a session never arranged has none.
       await commandApi.trash(campaign!, target.path.replace(/\.md$/i, '.canvas')).catch(() => {});
@@ -1101,7 +1130,7 @@
         danger: true,
       });
       if (!confirmed) return;
-      if (bufState.path?.startsWith(`${column.track}/`)) await buffer.close();
+      if (bufState.path?.startsWith(`${column.track}/`)) await buffer.close(true);
       if (openImage?.startsWith(`${column.track}/`)) openImage = null;
       await commandApi.trash(campaign!, column.track);
       await refreshIndex();
@@ -1126,6 +1155,7 @@
   function renameCampaign(name: string): Promise<string | null> {
     return attempt(async () => {
       const old = campaign!;
+      if (!(await mayLeaveNote())) return;
       await leaveCampaign();
       try {
         const renamed = await commandApi.renameCampaign(old, name);

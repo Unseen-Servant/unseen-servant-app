@@ -384,6 +384,76 @@ def test_rename_note_refuses_a_clash_but_allows_a_case_change(camp):
     assert "[[ISMARK]]" in (camp / "NPCs" / "Ireena.md").read_text()
 
 
+# "Château" with its â and its e-acute as one letter each (NFC), and as a
+# letter and an accent (NFD, what Finder and an unzipped archive can leave).
+CHATEAU_NFC = "Ch\u00e2teau"
+CHATEAU_NFD = "Cha\u0302teau"
+
+
+def test_a_name_in_the_other_unicode_form_is_the_same_name(camp):
+    """macOS takes both spellings for one file, so a rename to the other
+    spelling used to replace the note that had it."""
+    write(camp / "Locations" / f"{CHATEAU_NFD}.md", "The castle.\n")
+    with pytest.raises(Conflict, match="already exists"):
+        vault.rename_note(camp, "NPCs/Ismark.md", CHATEAU_NFC)
+    with pytest.raises(Conflict, match="already exists"):
+        vault.create_note(camp, "NPCs", CHATEAU_NFC)
+    assert vault.free_name(camp, CHATEAU_NFC) == f"{CHATEAU_NFC} 2"
+    assert (camp / "Locations" / f"{CHATEAU_NFD}.md").read_text() == "The castle.\n"
+    assert (camp / "NPCs" / "Ismark.md").exists()
+
+    write(camp / "NPCs" / f"{CHATEAU_NFD}.png", "", raw=b"old")
+    with pytest.raises(Conflict):
+        vault.create_image(camp, "NPCs", f"{CHATEAU_NFC}.png", b"new")
+    assert (camp / "NPCs" / f"{CHATEAU_NFD}.png").read_bytes() == b"old"
+
+    (camp / CHATEAU_NFD).mkdir()
+    with pytest.raises(Conflict):
+        vault.create_track(camp, CHATEAU_NFC)
+    with pytest.raises(Conflict):
+        vault.rename_track(camp, "NPCs", CHATEAU_NFC)
+
+
+def test_a_note_can_be_respelled_in_the_other_unicode_form(camp):
+    write(camp / "Locations" / f"{CHATEAU_NFD}.md", "The castle.\n")
+    path, _ = vault.rename_note(camp, f"Locations/{CHATEAU_NFD}.md", CHATEAU_NFC)
+    assert path == f"Locations/{CHATEAU_NFC}.md"
+    assert (camp / path).read_text() == "The castle.\n"
+    assert len([p for p in (camp / "Locations").iterdir() if p.name.endswith("teau.md")]) == 1
+
+
+def test_a_rename_never_lands_on_another_file(camp, root, monkeypatch):
+    """The names check reads the campaign as Command sees it; the rename
+    itself replaces whatever the file system has there. With that check
+    blind, the file there still stands."""
+    monkeypatch.setattr(vault, "_names_in_use", lambda campaign, of: set())
+    monkeypatch.setattr(vault, "_image_names", lambda campaign: set())
+    with pytest.raises(Conflict, match="'NPCs/Ireena.md' already exists"):
+        vault.rename_note(camp, "NPCs/Ismark.md", "Ireena")
+    assert (camp / "NPCs" / "Ireena.md").read_text() == "Sister of [[Ismark]].\n"
+    assert (camp / "NPCs" / "Ismark.md").exists()
+
+    write(camp / "Shelf" / "crest.png", "", raw=b"old")
+    with pytest.raises(Conflict, match="'Shelf/crest.png' already exists"):
+        vault.create_image(camp, "Shelf", "crest.png", b"new")
+    assert (camp / "Shelf" / "crest.png").read_bytes() == b"old"
+
+    with pytest.raises(Conflict, match="'NPCs/Ireena.md' already exists"):
+        vault.create_note(camp, "NPCs", "Ireena")
+
+    # A rename replaces an empty folder too.
+    (camp / "Empty").mkdir()
+    with pytest.raises(Conflict, match="'Empty' already exists"):
+        vault.rename_track(camp, "NPCs", "Empty")
+    assert (camp / "NPCs" / "Ismark.md").exists()
+
+    (root / "Empty").mkdir()
+    monkeypatch.setattr(vault, "list_campaigns", lambda r: ["Curse of Strahd"])
+    with pytest.raises(Conflict, match="'Empty' already exists"):
+        vault.rename_campaign(root, "Curse of Strahd", "Empty")
+    assert (camp / "NPCs" / "Ismark.md").exists()
+
+
 def test_move_note_leaves_name_links_alone(camp):
     write(camp / "Locations" / "Church.md", "[[Ismark]] [[NPCs/Ismark]]")
     path, rewritten = vault.move_note(camp, "NPCs/Ismark.md", "Locations")
