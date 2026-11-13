@@ -45,6 +45,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **A re-index keeps the game system tags of a book.** Detection runs only for a book that has no tags
 - **A book indexes at the path that a renamed book had before.** Legend Lore refused such a book
 - **A campaign opens when a note has a property that Command cannot read.** A value such as `1021-15-40`, which looks like a date and is not one, shows as text
+- **A link in a book's text or on a board text card does not replace the app's window.** A web link opens in the browser
+- **A book with `#`, `?` or `%` in its name or folder opens at the page of a result.** Notes sent to Command from such a book keep a source link that opens
 
 ## [4.3.0] - 2026-10-25
 

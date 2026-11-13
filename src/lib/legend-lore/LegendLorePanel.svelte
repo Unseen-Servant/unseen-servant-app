@@ -711,7 +711,9 @@
       // Viewers that ignore the fragment (notably macOS Preview) silently
       // open at page 1 — page 1 is also the openPath fallback below.
       if (page && page > 0) {
-        await openUrl(pdfFileUrl(path, page));
+        // The page is a nicety: a URL the system won't open still opens
+        // the book.
+        await openUrl(pdfFileUrl(path, page)).catch(() => openPath(path));
       } else {
         await openPath(path);
       }

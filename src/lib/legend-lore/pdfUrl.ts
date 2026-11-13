@@ -11,10 +11,15 @@
  *   - Windows drive paths (`C:\path` or `C:/path`)   → `file:///C:/path`
  *
  * URL constructor handles percent-encoding of spaces and other special
- * chars in path segments; we don't reinvent that here.
+ * chars in path segments; we don't reinvent that here. It reads `#`, `?`
+ * and `%` as URL syntax though, and a file name holds them as plain
+ * characters ("Dungeon #150.pdf" lost everything from the `#` on), so
+ * those three are escaped before it sees the path.
  */
 export function pdfFileUrl(absolutePath: string, page?: number | null): string {
-  const forwardSlashed = absolutePath.replace(/\\/g, '/');
+  const forwardSlashed = absolutePath
+    .replace(/\\/g, '/')
+    .replace(/[%#?]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   const isWindowsDrive = /^[a-zA-Z]:/.test(forwardSlashed);
   const prefix = isWindowsDrive ? 'file:///' : 'file://';
   const url = new URL(prefix + forwardSlashed);

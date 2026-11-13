@@ -9,7 +9,8 @@
   import { Handle, NodeResizer, Position } from '@xyflow/svelte';
   import { getContext } from 'svelte';
   import RenameField from '../ui/RenameField.svelte';
-  import { CARD_ACTIONS, linkify, paint, type CardActions, type CardData } from './board';
+  import { CARD_ACTIONS, NOTE_HREF, linkify, paint, type CardActions, type CardData } from './board';
+  import { clickedHref, openWebLink } from '../ui/links';
   import { m } from '../paraglide/messages';
 
   export let data: CardData;
@@ -41,6 +42,15 @@
     } else {
       actions.finish(card.id, text === card.text ? undefined : { text });
     }
+  }
+
+  /** Links in a text card, as a note card's (CardFace): a `[[link]]` opens
+   *  its note, a web link the browser. */
+  function followLink(e: MouseEvent) {
+    const href = clickedHref(e);
+    if (!href) return;
+    if (href.startsWith(NOTE_HREF)) actions.follow(decodeURIComponent(href.slice(NOTE_HREF.length)));
+    else openWebLink(href);
   }
 
   function textKey(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
@@ -99,7 +109,8 @@
         on:blur={(e) => finishText(e.currentTarget)}
       ></textarea>
     {:else}
-      <div class="text nowheel"><Markdown md={linkify(card.text)} {plugins} /></div>
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="text nowheel" on:click={followLink}><Markdown md={linkify(card.text)} {plugins} /></div>
     {/if}
   {:else if card.kind === 'link'}
     <span class="url">{card.text}</span>

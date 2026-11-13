@@ -6,6 +6,7 @@
   import { bookTitle, pageCitation } from './pdfUrl';
   import { findMatchedRange, splitAround, type MatchedParts } from './matchedSpan';
   import { queryTerms, rehypeMarkTerms } from './snippetHits';
+  import { followWebLink } from '../ui/links';
   import { m } from '../paraglide/messages';
 
   // No header of its own: the selected row names the book and system, and
@@ -144,7 +145,10 @@
           </div>
         {/if}
 
-        <div class="snippet" use:followResizes>
+        <!-- A page that prints a web address reads as a link (GFM): a
+             click opens the browser, and never loads the site in here. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <div class="snippet" use:followResizes on:click={followWebLink}>
           {#if parts}
             <!-- Three documents, not one: the range is snapped to whole
                  Markdown blocks so a table straddling it stays renderable. -->

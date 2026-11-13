@@ -25,6 +25,20 @@ describe('pdfFileUrl', () => {
       .toBe('file:///Users/gm/My%20Books/Black%20Flag.pdf#page=5');
   });
 
+  it('keeps #, ? and % in a file name as part of the name', () => {
+    // "Dungeon #150.pdf" came out as file:///…/Dungeon%20#page=5.
+    expect(pdfFileUrl('/Users/gm/Mags/Dungeon #150.pdf', 5))
+      .toBe('file:///Users/gm/Mags/Dungeon%20%23150.pdf#page=5');
+    expect(pdfFileUrl('/Users/gm/Who? What?/100% Loot.pdf'))
+      .toBe('file:///Users/gm/Who%3F%20What%3F/100%25%20Loot.pdf');
+    expect(pdfFileUrl('C:\\Mags\\Dragon #300.pdf', 7))
+      .toBe('file:///C:/Mags/Dragon%20%23300.pdf#page=7');
+    // The URL a viewer is handed names the file it was built from.
+    for (const path of ['/a/Dungeon #150.pdf', '/a/50%25 off?.pdf', '/a/plain name.pdf']) {
+      expect(decodeURIComponent(new URL(pdfFileUrl(path, 3)).pathname)).toBe(path);
+    }
+  });
+
   it('handles Windows drive-letter paths with backslashes', () => {
     expect(pdfFileUrl('C:\\Users\\gm\\SRD.pdf', 12))
       .toBe('file:///C:/Users/gm/SRD.pdf#page=12');
