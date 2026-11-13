@@ -62,6 +62,22 @@ fn show_tool_window(app: &tauri::AppHandle) {
     }
 }
 
+/// A second launch lands here, in the app that is already running: it
+/// comes forward and the new process exits. During the boot that's the
+/// splash, since the main window isn't ready to be seen yet.
+#[cfg(all(desktop, not(debug_assertions)))]
+fn on_second_launch(app: &tauri::AppHandle) {
+    if let Some(splash) = app.get_webview_window(boot::SPLASH_LABEL) {
+        let _ = splash.set_focus();
+        return;
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Sidecar port and health checks (sidecar, models, MCP). legend_lore.rs
 // reaches the sidecar through sidecar_url() as well.
@@ -433,10 +449,64 @@ fn sidecar_not_ready_message(log_path: &Path) -> String {
     msg
 }
 
+/// What the app says when another sidecar has the data dir.
+const DATA_DIR_IN_USE: &str =
+    "Another copy of Unseen Servant is running and has this library open. Close it, then start the app again.";
+
+/// How long a launch waits for the data dir: a sidecar whose app crashed
+/// notices within 2 seconds, then shuts down.
+const DATA_DIR_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
+
+/// Whether a sidecar has this data dir right now. It keeps ``sidecar.lock``
+/// locked for as long as it runs (`hold_data_dir` in server.py), and the
+/// lock dies with the process, so a crash never leaves it behind. Anything
+/// but a plain "locked" answer counts as free: a file system without locks
+/// starts the sidecar as it always did.
+fn data_dir_in_use(data_dir: &Path) -> bool {
+    let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(data_dir.join("sidecar.lock"))
+    else {
+        return false;
+    };
+    match file.try_lock() {
+        Ok(()) => {
+            let _ = file.unlock();
+            false
+        }
+        Err(std::fs::TryLockError::WouldBlock) => true,
+        Err(std::fs::TryLockError::Error(_)) => false,
+    }
+}
+
+/// True once the data dir is free, false when it's still taken at the end
+/// of ``wait``.
+fn wait_for_data_dir(data_dir: &Path, wait: std::time::Duration) -> bool {
+    let deadline = std::time::Instant::now() + wait;
+    while data_dir_in_use(data_dir) {
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    true
+}
+
 fn start_sidecar(
     data_dir: &Path,
     models_dir: Option<&Path>,
     llama_server: Option<&Path>,
+) -> Result<Child, String> {
+    start_sidecar_within(data_dir, models_dir, llama_server, DATA_DIR_WAIT)
+}
+
+/// ``start_sidecar`` with its wait for the data dir spelled out.
+fn start_sidecar_within(
+    data_dir: &Path,
+    models_dir: Option<&Path>,
+    llama_server: Option<&Path>,
+    data_dir_wait: std::time::Duration,
 ) -> Result<Child, String> {
     let (program, base_args): (std::path::PathBuf, Vec<String>) = if cfg!(debug_assertions) {
         // Dev mode: use source-tree Python
@@ -460,6 +530,13 @@ fn start_sidecar(
         let binary = sidecar_binary_path("legend-lore-sidecar")?;
         (binary, vec![])
     };
+
+    // Two sidecars on one data dir write one library store, and the second
+    // would take the first one's port and token files. Checked before
+    // anything of the running one is touched: its log, then those files.
+    if !wait_for_data_dir(data_dir, data_dir_wait) {
+        return Err(DATA_DIR_IN_USE.to_string());
+    }
 
     // Log sidecar stderr to a file for diagnostics (especially useful in
     // production builds where there is no terminal to observe output).
@@ -579,7 +656,17 @@ fn migrate_legacy_data_dir(app_data_dir: &Path) {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // First in the chain, as the plugin asks: a second launch hands over to
+    // the app that is already running before anything of its own starts.
+    // macOS already refuses a second copy of an installed app; Windows and
+    // Linux don't. A dev build stays out of it, or an installed app that is
+    // running would swallow it.
+    #[cfg(all(desktop, not(debug_assertions)))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        on_second_launch(app)
+    }));
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -872,6 +959,84 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    /// The lock a running sidecar keeps on its data dir.
+    fn held_lock(dir: &Path) -> std::fs::File {
+        let file = std::fs::File::create(dir.join("sidecar.lock")).unwrap();
+        file.try_lock().unwrap();
+        file
+    }
+
+    #[test]
+    fn a_data_dir_is_in_use_only_while_a_sidecar_holds_its_lock() {
+        let dir = scratch_dir("lock-held");
+        assert!(!data_dir_in_use(&dir));
+
+        let sidecar = held_lock(&dir);
+        assert!(data_dir_in_use(&dir));
+
+        // A sidecar that ended, however it ended, holds nothing.
+        drop(sidecar);
+        assert!(!data_dir_in_use(&dir));
+        // Asking leaves nothing held either.
+        assert!(!data_dir_in_use(&dir));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_data_dir_that_does_not_exist_yet_is_free() {
+        let dir = scratch_dir("lock-first-run").join("chroma_db");
+        assert!(!data_dir_in_use(&dir));
+        assert!(wait_for_data_dir(&dir, std::time::Duration::ZERO));
+    }
+
+    #[test]
+    fn a_launch_waits_out_a_sidecar_that_is_shutting_down() {
+        let dir = scratch_dir("lock-wait");
+        let sidecar = held_lock(&dir);
+        let ending = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            drop(sidecar);
+        });
+
+        assert!(wait_for_data_dir(&dir, std::time::Duration::from_secs(5)));
+        ending.join().unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_launch_gives_up_on_a_data_dir_that_stays_taken() {
+        let dir = scratch_dir("lock-taken");
+        let _sidecar = held_lock(&dir);
+        let started = std::time::Instant::now();
+
+        assert!(!wait_for_data_dir(
+            &dir,
+            std::time::Duration::from_millis(300)
+        ));
+        assert!(started.elapsed() >= std::time::Duration::from_millis(300));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_refused_launch_touches_nothing_of_the_running_sidecar() {
+        let app_dir = scratch_dir("lock-refused");
+        let dir = app_dir.join("chroma_db");
+        std::fs::create_dir_all(&dir).unwrap();
+        let _sidecar = held_lock(&dir);
+        std::fs::write(dir.join("sidecar.port"), "4242").unwrap();
+        std::fs::write(dir.join("sidecar.token"), "s3cret").unwrap();
+        std::fs::write(app_dir.join("sidecar.log"), "serving").unwrap();
+
+        let refused = start_sidecar_within(&dir, None, None, std::time::Duration::ZERO);
+
+        assert_eq!(refused.err().as_deref(), Some(DATA_DIR_IN_USE));
+        let read = |path: std::path::PathBuf| std::fs::read_to_string(path).unwrap();
+        assert_eq!(read(dir.join("sidecar.port")), "4242");
+        assert_eq!(read(dir.join("sidecar.token")), "s3cret");
+        assert_eq!(read(app_dir.join("sidecar.log")), "serving");
+        std::fs::remove_dir_all(&app_dir).unwrap();
     }
 
     #[test]

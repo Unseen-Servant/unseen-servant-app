@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import errno
 import hmac
 import os
 import secrets
@@ -55,6 +56,7 @@ from legend_lore.service import (
 
 PORT_FILENAME = "sidecar.port"
 TOKEN_FILENAME = "sidecar.token"
+LOCK_FILENAME = "sidecar.lock"
 
 
 def parse_args():
@@ -91,6 +93,77 @@ def remove_port_file(data_dir: Path) -> None:
         (data_dir / PORT_FILENAME).unlink(missing_ok=True)
     except OSError:
         pass
+
+
+# ---------------------------------------------------------------------------
+# One sidecar per data dir
+# ---------------------------------------------------------------------------
+
+DATA_DIR_IN_USE = (
+    "Another copy of Unseen Servant is running and has this library open. "
+    "Close it, then start the app again."
+)
+
+
+class DataDirInUse(Exception):
+    """Another sidecar holds this data dir."""
+
+
+def _try_lock(handle) -> bool:
+    """Lock the open file without waiting. False when another process has
+    it; any other failure is the caller's to read (OSError)."""
+    if os.name == "nt":
+        import msvcrt
+
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError as e:
+            if e.errno in (errno.EACCES, errno.EDEADLK):
+                return False
+            raise
+        return True
+    import fcntl
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def hold_data_dir(data_dir: Path, *, patience: float = 1.0, try_lock=_try_lock):
+    """Take the data dir for this process, or raise DataDirInUse.
+
+    Two sidecars on one data dir write one library store, and the second
+    takes the first one's port and token files. The lock is on
+    ``sidecar.lock`` and lives as long as the returned file stays open: the
+    system drops it when the process ends, however it ends, so a crash
+    never leaves the data dir taken. The app asks the same lock before it
+    starts a sidecar (`data_dir_in_use` in lib.rs), which is the answer a
+    second launch normally gets. That asking holds the lock for an instant,
+    hence ``patience``: a taken lock gets that many seconds to come free.
+
+    Returns None where the lock can't be had at all (a file system without
+    locks): the sidecar runs as it did before there was one.
+    """
+    try:
+        handle = open(data_dir / LOCK_FILENAME, "a")
+    except OSError as e:
+        print(f"Warning: no lock on the data dir ({e})")
+        return None
+    deadline = time.monotonic() + patience
+    while True:
+        try:
+            if try_lock(handle):
+                return handle
+        except OSError as e:
+            handle.close()
+            print(f"Warning: no lock on the data dir ({e})")
+            return None
+        if time.monotonic() >= deadline:
+            handle.close()
+            raise DataDirInUse(DATA_DIR_IN_USE)
+        time.sleep(0.1)
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +393,17 @@ def _process_alive(pid: int) -> bool:
     return True
 
 
+def _stop_self(posix: bool = os.name == "posix") -> None:
+    """Shut down as a SIGTERM from the app would: uvicorn stops serving,
+    then the ``finally`` under ``__main__`` runs and llama-server goes too."""
+    if posix:
+        os.kill(os.getpid(), signal.SIGTERM)
+    else:
+        # os.kill is TerminateProcess on Windows: no handler, no clean-up,
+        # and llama-server left running. raise_signal runs the handler.
+        signal.raise_signal(signal.SIGTERM)
+
+
 def _watch_parent(parent_pid: int, poll_interval: float = 2.0) -> None:
     """Background thread: self-terminate when the app process dies.
 
@@ -334,8 +418,78 @@ def _watch_parent(parent_pid: int, poll_interval: float = 2.0) -> None:
         time.sleep(poll_interval)
         if not _process_alive(parent_pid):
             print(f"Parent process (PID {parent_pid}) died, shutting down sidecar.")
-            os.kill(os.getpid(), signal.SIGTERM)
+            _stop_self()
             break
+
+
+class _Kernel32:
+    """The three Windows calls the watchdog makes, so a test can stand in
+    for them."""
+
+    SYNCHRONIZE = 0x00100000
+    INFINITE = 0xFFFFFFFF
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+
+        self._ctypes = ctypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k32.WaitForSingleObject.restype = wintypes.DWORD
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+        k32.CloseHandle.restype = wintypes.BOOL
+        self._k32 = k32
+
+    def open_process(self, pid: int) -> tuple[int | None, int]:
+        """(handle, 0), or (None, the Windows error code)."""
+        handle = self._k32.OpenProcess(self.SYNCHRONIZE, False, pid)
+        return (handle, 0) if handle else (None, self._ctypes.get_last_error())
+
+    def wait(self, handle: int) -> int:
+        return self._k32.WaitForSingleObject(handle, self.INFINITE)
+
+    def close(self, handle: int) -> None:
+        self._k32.CloseHandle(handle)
+
+
+_ERROR_INVALID_PARAMETER = 87  # OpenProcess: no process has that PID
+_WAIT_OBJECT_0 = 0
+
+
+def _wait_for_exit_windows(pid: int, kernel32=None) -> bool:
+    """Block until process ``pid`` has ended. False when it can't be
+    watched: the caller then leaves the sidecar running, as before."""
+    k32 = kernel32 or _Kernel32()
+    handle, error = k32.open_process(pid)
+    if handle is None:
+        # Already gone is an answer; anything else (access denied) isn't.
+        return error == _ERROR_INVALID_PARAMETER
+    try:
+        return k32.wait(handle) == _WAIT_OBJECT_0
+    finally:
+        k32.close(handle)
+
+
+def _watch_parent_windows(parent_pid: int, wait=_wait_for_exit_windows, stop=_stop_self) -> None:
+    """``_watch_parent`` for Windows, where signal 0 is no probe
+    (``os.kill(pid, 0)`` sends a CTRL_C_EVENT). A process handle signals
+    when the process ends, so this waits on the app's rather than polling.
+    An orphan here would hold the data dir, and the next launch would be
+    told another copy is running. Anything that goes wrong leaves the
+    sidecar running unwatched."""
+    try:
+        gone = wait(parent_pid)
+    except Exception as e:
+        print(f"Warning: can't watch the app process ({e})")
+        return
+    if gone:
+        print(f"Parent process (PID {parent_pid}) died, shutting down sidecar.")
+        stop()
+    else:
+        print(f"Warning: can't watch the app process (PID {parent_pid})")
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +514,16 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _graceful_exit)
     signal.signal(signal.SIGINT, _graceful_exit)
 
+    # Before the port and token files: they belong to the sidecar that has
+    # the data dir, and a second one mustn't replace them. Kept in a name so
+    # the file, and the lock with it, lasts as long as the process.
+    data_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        data_dir_lock = hold_data_dir(data_dir)
+    except DataDirInUse as e:
+        print(e)
+        raise SystemExit(1) from None
+
     # Pre-bind the socket ourselves so ``--port 0`` resolves to an actual port
     # number that we can publish to disk before uvicorn starts serving. The
     # Rust readiness gate polls ``data_dir/sidecar.port`` to learn where to
@@ -370,7 +534,6 @@ if __name__ == "__main__":
     actual_port = sock.getsockname()[1]
     print(f"Starting sidecar on port {actual_port}, data dir: {data_dir}")
 
-    data_dir.mkdir(parents=True, exist_ok=True)
     token = secrets.token_urlsafe(32)
     write_token_file(data_dir, token)
     write_port_file(data_dir, actual_port)
@@ -389,12 +552,9 @@ if __name__ == "__main__":
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
     # Start parent-death watchdog (daemon thread — won't block exit).
-    # POSIX only: on Windows os.kill(pid, 0) sends a CTRL_C_EVENT rather
-    # than probing, and the getppid() check never fired there either.
-    if os.name == "posix":
-        parent_pid = args.parent_pid or os.getppid()
-        watchdog = threading.Thread(target=_watch_parent, args=(parent_pid,), daemon=True)
-        watchdog.start()
+    parent_pid = args.parent_pid or os.getppid()
+    watch = _watch_parent if os.name == "posix" else _watch_parent_windows
+    threading.Thread(target=watch, args=(parent_pid,), daemon=True).start()
 
     # llama-server loads bge-m3 behind the splash. Its log sits beside
     # sidecar.log, which Rust writes one level above the data dir.

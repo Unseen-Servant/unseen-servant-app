@@ -47,6 +47,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **A campaign opens when a note has a property that Command cannot read.** A value such as `1021-15-40`, which looks like a date and is not one, shows as text
 - **A link in a book's text or on a board text card does not replace the app's window.** A web link opens in the browser
 - **A book with `#`, `?` or `%` in its name or folder opens at the page of a result.** Notes sent to Command from such a book keep a source link that opens
+- **A second launch shows the app that is running.** On Windows and Linux it started a second copy of the app
+- **Two copies of the app do not open one library.** A copy that starts while a different copy has the library says so, and its search and indexing stay off
+- **The app's local service stops when the app crashes on Windows.** It stayed in the background and kept the library open
 
 ## [4.3.0] - 2026-10-25
 
