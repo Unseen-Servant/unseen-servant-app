@@ -44,8 +44,9 @@ EMBEDDING_DIM = 1024
 # bge-m3 isn't causal: llama-server embeds an input in one physical batch
 # (-ub) and rejects a longer one instead of truncating it, so the batch is
 # the whole 8192-token context. Unified KV stops -np's slots from splitting
-# that context four ways. Four slots serve the indexer's batches in flight
-# (EMBED_CONCURRENCY) plus a search; eight added memory, not speed (#413).
+# that context four ways. One request's inputs spread over the four slots,
+# which is the indexer's speed; eight added memory, not speed (#413). A
+# search's query waits its turn behind them (EMBED_BATCH_SIZE in service.py).
 MAX_INPUT_TOKENS = 8192
 LLAMA_SERVER_FLAGS = (
     "--embeddings", "--pooling", "cls",
@@ -71,11 +72,8 @@ _log_dir: Path | None = None
 def _embed_timeout() -> float:
     """Seconds to wait for one embed request.
 
-    120s by default: chromadb's 60s was too tight for a 256-input bge-m3
-    batch on slower hardware. Without an effective timeout, a wedged
-    server blocks the worker thread indefinitely, which blocks
-    ``fut.result()`` in ``_embed_and_upsert_units``, which holds the sync
-    lock forever.
+    120s by default. Without an effective timeout, a wedged server blocks
+    ``_embed_units`` indefinitely, which holds the sync lock forever.
 
     Override at runtime with ``EMBED_TIMEOUT_SECONDS``.
     """

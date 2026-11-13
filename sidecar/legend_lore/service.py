@@ -14,7 +14,6 @@ import threading
 import time
 import traceback
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePath
@@ -1160,14 +1159,16 @@ def _fts_text(eu: EmbedUnit) -> str:
     return _with_heading(eu.section_heading, eu.text, HEADING_FTS)
 
 
-# Embed batching tunables (issue #158).
-# 256 was chosen over the previous 100 to amortize Ollama per-call overhead;
-# bge-m3 embeds each input independently so the 8192 ctx applies per input,
-# not per batch (mean embed-text size ~400 chars / ~100 tokens). Concurrency=3
-# fires up to N embed batches at the embedder in parallel; the book is written to
-# the store once, after every batch has embedded.
-EMBED_BATCH_SIZE = 256
-EMBED_CONCURRENCY = 3
+# Embed batching (issue #158; measured again 2026-11-12 on llama-server).
+# llama-server spreads one request's inputs over all its slots and takes
+# them first come, first served, so sending more at once adds no speed: it
+# only lengthens the line a search's query waits in. On an M1 Pro the
+# indexer embedded 36 units/s at every setting tried. Behind three batches
+# of 256 in flight (the old setting) a search waited 13 to 20 s for its
+# query vector; behind one batch of 32 it waits 0.4 s, 0.7 s at worst, and
+# 16 was no better. So: one batch at a time, 32 units each. A small batch
+# also stays far inside the embed timeout on a machine without a GPU.
+EMBED_BATCH_SIZE = 32
 
 
 # A model runner can drop an in-flight embed ("connection reset by peer")
@@ -1232,35 +1233,24 @@ def _embed_units(
     pdf_path: Path,
     vectors: list[list[float]],
     batch_size: int = EMBED_BATCH_SIZE,
-    concurrency: int = EMBED_CONCURRENCY,
 ):
-    """Embed batches concurrently, collecting vectors in submission order.
+    """Embed one batch after another, collecting vectors in unit order.
 
     Generator that appends each batch's vectors to ``vectors`` and yields
     its unit count, so streaming callers can report progress while the
-    book is still embedding. Submission-order draining keeps ``vectors``
-    aligned with ``embed_units``.
+    book is still embedding. One batch is with the embedder at a time
+    (see EMBED_BATCH_SIZE), and a caller that stops reading stops the
+    embedding with it.
 
-    Raises ``EmbedBatchError`` if any batch fails. Pending futures are
-    cancelled before the exception propagates so the executor exits
-    promptly.
+    Raises ``EmbedBatchError`` if a batch fails.
     """
-    if not embed_units:
-        return
-    batches = [
-        embed_units[i:i + batch_size]
-        for i in range(0, len(embed_units), batch_size)
-    ]
-    with ThreadPoolExecutor(max_workers=concurrency) as ex:
-        futures = [ex.submit(_embed_batch, embed_fn, b) for b in batches]
+    for i in range(0, len(embed_units), batch_size):
+        batch = embed_units[i:i + batch_size]
         try:
-            for batch, fut in zip(batches, futures):
-                vectors.extend(fut.result())
-                yield len(batch)
+            vectors.extend(_embed_batch(embed_fn, batch))
         except Exception as e:
-            for f in futures:
-                f.cancel()
             raise EmbedBatchError(pdf_path, str(e)) from e
+        yield len(batch)
 
 
 def _atomic_index_pdf(

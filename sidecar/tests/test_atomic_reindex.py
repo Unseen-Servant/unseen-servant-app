@@ -88,7 +88,7 @@ def test_embed_failure_raises_embed_batch_error():
     with pytest.raises(EmbedBatchError) as exc_info:
         list(_embed_units(
             _boom("ollama is wedged"), units, Path("/lib/test.pdf"), [],
-            batch_size=3, concurrency=2,
+            batch_size=3,
         ))
     err = exc_info.value
     assert err.source_path == Path("/lib/test.pdf")
