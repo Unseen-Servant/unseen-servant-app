@@ -395,8 +395,9 @@ pub async fn command_set_spend_on_launch(enabled: bool) -> Result<CommandSetting
     .await
 }
 
-#[tauri::command]
-pub async fn command_set_root(root: Option<String>) -> Result<CommandSettings, String> {
+/// Not a command: the root changes only through the native picker
+/// (`command_choose_root`), never to a path the webview names.
+async fn set_root(root: &str) -> Result<CommandSettings, String> {
     answer(
         client()
             .put(api("/settings"))
@@ -424,7 +425,7 @@ pub async fn command_choose_root(app: AppHandle) -> Result<Option<CommandSetting
         return Ok(None);
     };
     switch_campaign_with(&app, || async { Ok(None) }).await?;
-    let changed = command_set_root(Some(path.to_string())).await;
+    let changed = set_root(&path.to_string()).await;
     open_untitled(&app).await?;
     changed.map(Some)
 }

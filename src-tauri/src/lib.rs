@@ -55,9 +55,12 @@ fn open_tool_window(app: &tauri::AppHandle) {
     }
 }
 
+/// Bring the main window forward from wherever it is: hidden to the tray,
+/// minimized, or behind other windows.
 fn show_tool_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
     }
 }
@@ -71,11 +74,7 @@ fn on_second_launch(app: &tauri::AppHandle) {
         let _ = splash.set_focus();
         return;
     }
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
+    show_tool_window(app);
 }
 
 // ---------------------------------------------------------------------------
@@ -716,7 +715,6 @@ pub fn run() {
             panels::pop_out_panel,
             panels::dock_panel,
             command::command_get_settings,
-            command::command_set_root,
             command::command_choose_root,
             command::command_add_place,
             command::command_forget_place,
@@ -854,13 +852,7 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
-                    }
+                    "show" => show_tool_window(app),
                     "quit" => {
                         app.exit(0);
                     }
@@ -873,12 +865,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
+                        show_tool_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -920,11 +907,7 @@ pub fn run() {
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
                     // macOS: user clicked dock icon while app is running
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.unminimize();
-                        let _ = window.set_focus();
-                    }
+                    show_tool_window(app_handle);
                 }
                 tauri::RunEvent::Exit => {
                     // What an editor hadn't saved yet, typed in the moment
