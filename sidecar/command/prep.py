@@ -24,7 +24,8 @@ def today() -> date:
 
 
 def natural(name: str) -> list:
-    return [int(t) if t.isdigit() else t.casefold() for t in re.split(r"(\d+)", name)]
+    # isdecimal, as \d matches: "²" is a digit to isdigit, and no number to int.
+    return [int(t) if t.isdecimal() else t.casefold() for t in re.split(r"(\d+)", name)]
 
 
 def _in(note: dict, folder: str) -> bool:

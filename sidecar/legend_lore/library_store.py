@@ -275,12 +275,31 @@ class LibraryStore:
             ).fetchone()[0]
             self._delete_document_rows(conn, doc_id, keep_document=True)
             self._write_systems(conn, doc_id, game_system, systems)
+
+            # The table keys parents across books, and the id a parent comes
+            # with is hashed from the path its book was indexed at. A book
+            # renamed since still holds the ids of its old path, so another
+            # book indexed there comes with the same ones. Its own rows are
+            # gone by now: an id still in the table is another book's, and
+            # this book's copy of it takes the document id to stay apart.
+            incoming = [p.parent_id for p in parents]
+            held: set[str] = set()
+            for i in range(0, len(incoming), 500):
+                some = incoming[i:i + 500]
+                held.update(row[0] for row in conn.execute(
+                    f"SELECT parent_id FROM parents WHERE parent_id IN ({_marks(some)})",
+                    some,
+                ))
+
+            def scoped(parent_id: str) -> str:
+                return f"{parent_id}_d{doc_id}" if parent_id in held else parent_id
+
             conn.executemany(
                 "INSERT INTO parents (parent_id, document_id, text, "
                 "section_heading, page_start, page_end, chunk_type, "
                 "section_id, section_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (p.parent_id, doc_id, p.text, p.section_heading,
+                    (scoped(p.parent_id), doc_id, p.text, p.section_heading,
                      p.page_start, p.page_end, p.chunk_type,
                      p.section_id, p.section_path)
                     for p in parents
@@ -292,7 +311,7 @@ class LibraryStore:
                 "page_label_start, page_label_end, section_id, section_path) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (doc_id, u.ordinal, u.parent_id, u.text, u.chunk_type,
+                    (doc_id, u.ordinal, scoped(u.parent_id), u.text, u.chunk_type,
                      u.section_heading, u.page_start, u.page_end,
                      labels.get(u.page_start, ""), labels.get(u.page_end, ""),
                      u.section_id, u.section_path)

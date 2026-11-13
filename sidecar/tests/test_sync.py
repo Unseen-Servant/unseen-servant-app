@@ -16,7 +16,7 @@ from legend_lore.service import (
     IndexManifest,
     ManifestEntry,
 )
-from tests.conftest import make_pdf, run_sync
+from tests.conftest import make_pdf, read_manifest, run_sync, sse_events
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +264,151 @@ def test_sync_names_the_books_it_could_not_extract(
     assert data["added"] == 1
     assert data["unindexable_paths"] == [str(empty_pdf_path)]
     assert data["errors"] == ["scanned_module.pdf: Empty or scanned PDF"]
+
+
+# ---------------------------------------------------------------------------
+# One book's failure stays with that book
+# ---------------------------------------------------------------------------
+
+def test_a_book_that_breaks_the_indexer_does_not_end_the_sync(
+    client, test_store, tmp_path, monkeypatch
+):
+    """Only an embed failure was caught per book. Anything else (a page
+    label tree PyMuPDF can't walk, a store write) ended the stream with no
+    ``complete`` event and the books after it unindexed, and the next sync
+    stopped at the same file."""
+    from legend_lore import router as router_mod
+
+    books = [
+        make_pdf(tmp_path / "lib" / "a.pdf", "Goblins ambush the caravan at dusk."),
+        make_pdf(tmp_path / "lib" / "b.pdf", "A book whose page labels start at page two."),
+        make_pdf(tmp_path / "lib" / "c.pdf", "The lich keeps its phylactery under the well."),
+    ]
+    selected = {"selected_paths": [str(b) for b in books]}
+    real_labels = router_mod._page_labels
+
+    def labels(pdf_path):
+        if pdf_path.name == "b.pdf":
+            raise RuntimeError("bad page label tree")
+        return real_labels(pdf_path)
+
+    monkeypatch.setattr(router_mod, "_page_labels", labels)
+    events = sse_events(client.post("/api/sync-index-stream", json=selected))
+
+    data = events[-1]
+    assert data["event"] == "complete"
+    assert data["added"] == 2
+    assert data["errors"] == ["b.pdf: bad page label tree"]
+    # Not a scan: the app keeps it ticked, and the next sync tries it again.
+    assert data["unindexable_paths"] == []
+    assert events[-2]["files_done"] == events[-2]["total_files"] == 3
+    assert sorted(read_manifest(tmp_path)["files"]) == [str(books[0]), str(books[2])]
+    assert sorted(d.filename for d in test_store.documents()) == ["a.pdf", "c.pdf"]
+
+    monkeypatch.setattr(router_mod, "_page_labels", real_labels)
+    again = run_sync(client, selected)
+    assert (again["added"], again["errors"]) == (1, [])
+
+
+def test_a_modified_book_that_breaks_the_indexer_keeps_its_index(
+    client, test_store, tmp_path, sample_pdf_path, monkeypatch
+):
+    from legend_lore import router as router_mod
+
+    run_sync(client, {"selected_paths": [str(sample_pdf_path)]})
+    count_before = test_store.count_units()
+    manifest_raw = read_manifest(tmp_path)
+    manifest_raw["files"][str(sample_pdf_path)]["mtime"] = 1.0
+    (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(manifest_raw))
+
+    def broken(chunks):
+        raise ValueError("granularity bug")
+
+    monkeypatch.setattr(router_mod, "build_granularity", broken)
+    data = run_sync(client, {"selected_paths": [str(sample_pdf_path)]})
+
+    assert data["updated"] == 0
+    assert data["errors"] == ["dragonbane_monsters.pdf: granularity bug"]
+    assert test_store.count_units() == count_before
+    entry = read_manifest(tmp_path)["files"][str(sample_pdf_path)]
+    assert entry["last_error"] == "dragonbane_monsters.pdf: granularity bug"
+    assert entry["chunk_count"] == manifest_raw["files"][str(sample_pdf_path)]["chunk_count"]
+
+
+def test_reindex_file_reports_a_book_that_breaks_the_indexer(
+    client, test_store, tmp_path, sample_pdf_path, monkeypatch
+):
+    from legend_lore import service
+
+    run_sync(client, {"selected_paths": [str(sample_pdf_path)]})
+    count_before = test_store.count_units()
+
+    def labels(pdf_path):
+        raise RuntimeError("bad page label tree")
+
+    monkeypatch.setattr(service, "_page_labels", labels)
+    response = client.post("/api/reindex-file", json={"path": str(sample_pdf_path)})
+
+    assert response.status_code == 200
+    assert response.json()["error"] == "dragonbane_monsters.pdf: bad page label tree"
+    assert test_store.count_units() == count_before
+    entry = read_manifest(tmp_path)["files"][str(sample_pdf_path)]
+    assert entry["last_error"] == "dragonbane_monsters.pdf: bad page label tree"
+
+
+# ---------------------------------------------------------------------------
+# A re-index keeps the tags a book has
+# ---------------------------------------------------------------------------
+
+def _tags(test_store, tmp_path, pdf_path):
+    """A book's tags as the manifest and the store each hold them."""
+    entry = read_manifest(tmp_path)["files"][str(pdf_path)]
+    (doc,) = [d for d in test_store.documents() if d.path == str(pdf_path)]
+    return (entry["game_system"], entry["game_systems"]), (doc.game_system, doc.systems)
+
+
+def test_a_reindex_keeps_the_tags_a_book_has(client, test_store, tmp_path, dnd5e_pdf_path):
+    """Every re-index ran detection again and wrote its answer over the
+    GM's own tags: "Re-index file", "Reindex all", and the sync of a file
+    whose mtime moved (a restored backup)."""
+    path = str(dnd5e_pdf_path)
+    run_sync(client, {"selected_paths": [path]})
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path)[0] == ("D&D 5E", ["D&D 5E"])
+
+    mine = ["Pathfinder 2E", "Homebrew"]
+    assert client.post("/api/set-game-systems", json={"path": path, "game_systems": mine}).status_code == 200
+    kept = (("Pathfinder 2E", mine), ("Pathfinder 2E", ("Homebrew", "Pathfinder 2E")))
+
+    assert client.post("/api/reindex-file", json={"path": path}).json()["error"] is None
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path) == kept
+
+    assert sse_events(client.post("/api/reindex-all-stream"))[-1]["updated"] == 1
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path) == kept
+
+    manifest_raw = read_manifest(tmp_path)
+    manifest_raw["files"][path]["mtime"] = 1.0
+    (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(manifest_raw))
+    assert run_sync(client, {"selected_paths": [path]})["updated"] == 1
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path) == kept
+
+    assert client.post("/api/index-files", json={"paths": [path]}).json()["indexed"] == 1
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path) == kept
+
+    # A tag named for the re-index still wins.
+    client.post("/api/reindex-file", json={"path": path, "game_system": "Dragonbane"})
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path)[0] == ("Dragonbane", ["Dragonbane"])
+
+
+def test_a_reindex_detects_the_system_of_a_book_with_no_tags(
+    client, test_store, tmp_path, dnd5e_pdf_path
+):
+    path = str(dnd5e_pdf_path)
+    run_sync(client, {"selected_paths": [path]})
+    client.post("/api/set-game-systems", json={"path": path, "game_systems": []})
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path)[0] == ("unknown", [])
+
+    client.post("/api/reindex-file", json={"path": path})
+    assert _tags(test_store, tmp_path, dnd5e_pdf_path)[0] == ("D&D 5E", ["D&D 5E"])
 
 
 def _embedder_down(texts):

@@ -12,6 +12,7 @@ import os
 import re
 import threading
 import time
+import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -855,6 +856,21 @@ def save_manifest(data_dir: Path, manifest: IndexManifest) -> None:
     os.replace(tmp_path, manifest_path)
 
 
+def kept_systems(entry: ManifestEntry | None) -> tuple[str, list[str]] | None:
+    """The tags a book already has, primary first, for a re-index to keep.
+
+    Detection is for a book with no tags yet. Once a book has some they are
+    the GM's to change (the badge menu), and a re-index — asked for, or made
+    by a changed file or a new pipeline version — leaves them alone. None
+    when there are none to keep.
+    """
+    if entry is None or not entry.game_systems:
+        return None
+    systems = list(entry.game_systems)
+    primary = entry.game_system if entry.game_system in systems else systems[0]
+    return primary, systems
+
+
 def _mark_manifest_error(
     manifest: IndexManifest,
     data_dir: Path | None,
@@ -1349,25 +1365,35 @@ def index_single_pdf(
     pdf_path: Path, store: LibraryStore, embed_fn,
     game_system: str | None = None,
     known_systems: dict[str, list[str]] | None = None,
+    keep_systems: tuple[str, list[str]] | None = None,
 ) -> tuple[int, str | None, str, list[str]]:
     """Extract, chunk, embed and write a single PDF to the library store.
 
     Returns (embed_unit_count, error_message, game_system, game_systems).
-    error_message is None on success. Embedding failures are converted to
-    an error message so callers can surface them without crashing — any
-    pre-existing chunks/parents for this source are left intact.
+    error_message is None on success. Whatever fails — the embedder, the
+    page labels, the store write — comes back as an error message, so one
+    book never takes its caller down; any pre-existing chunks/parents for
+    this source are left intact.
+
+    ``keep_systems`` (``kept_systems`` of the book's manifest entry) stands
+    in for detection on a re-index; an explicit ``game_system`` beats it.
     """
     chunks, resolved_system, resolved_systems, error = _extract_and_chunk(
         pdf_path, game_system, known_systems
     )
     if error:
         return 0, error, resolved_system, resolved_systems
+    if keep_systems and not game_system:
+        resolved_system, resolved_systems = keep_systems
     try:
         count = _index_chunks(
             chunks, pdf_path, resolved_system, resolved_systems, store, embed_fn
         )
     except EmbedBatchError as e:
         return 0, str(e), resolved_system, resolved_systems
+    except Exception as e:
+        traceback.print_exc()
+        return 0, f"{pdf_path.name}: {e}", resolved_system, resolved_systems
     return count, None, resolved_system, resolved_systems
 
 

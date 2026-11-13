@@ -41,6 +41,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Command keeps a note's text when a save fails.** It tries the save again, and asks before a different note or campaign opens over text that is not saved
 - **Text typed immediately before the app quits is saved.** This is also true when a tool's own window closes
 - **A rename does not replace a note that has the same name with its accents stored differently.** Command refuses the name, as it does for a name that is in use
+- **One book that fails does not stop a sync.** The sync reports the book and indexes the other books
+- **A re-index keeps the game system tags of a book.** Detection runs only for a book that has no tags
+- **A book indexes at the path that a renamed book had before.** Legend Lore refused such a book
+- **A campaign opens when a note has a property that Command cannot read.** A value such as `1021-15-40`, which looks like a date and is not one, shows as text
 
 ## [4.3.0] - 2026-10-25
 

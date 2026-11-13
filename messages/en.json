@@ -273,7 +273,7 @@
   "glossary_rack": "Rack",
   "glossary_rack_desc": "The main window's tools, laid out in views; 1–8 switch views",
   "reference_keywords": "Game system keywords",
-  "reference_keywords_desc": "A book gets a game system when one of that system's keywords appears in its path (folders and filename) or, failing that, near the start of its text. Case, spaces, accents and punctuation don't count, and {#em}&{/em} reads as {#em}n{/em}: {#em}d&d 5e{/em}, {#em}dnd-5e{/em} and {#em}DnD 5E{/em} all match. Keep keywords to four characters or more; shorter ones turn up inside unrelated words.",
+  "reference_keywords_desc": "A book gets a game system when one of that system's keywords appears in its path (folders and filename) or, failing that, near the start of its text. Case, spaces, accents and punctuation don't count, and {#em}&{/em} reads as {#em}n{/em}: {#em}d&d 5e{/em}, {#em}dnd-5e{/em} and {#em}DnD 5E{/em} all match. Keep keywords to four characters or more; shorter ones turn up inside unrelated words. A book that has tags keeps them when it is re-indexed.",
   "reference_keywords_search": "Name a system in a search and its books come first.",
   "reference_mcp": "MCP tools",
   "reference_mcp_desc": "What an AI agent connected through MCP can do. Command tools work on the campaign open in the app unless the agent names another.",

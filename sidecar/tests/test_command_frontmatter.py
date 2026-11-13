@@ -24,6 +24,30 @@ def test_load_reads_keys_and_refuses_broken_yaml():
     assert fm.load_lenient("---\nnotes: [unclosed\n---\n") == {}
 
 
+def test_a_value_shaped_like_a_date_that_is_not_one_reads_as_text():
+    """PyYAML raises ValueError building it, which is no YAMLError: one such
+    note used to make the whole campaign fail to load."""
+    text = "---\nborn: 1021-15-40\nspent: 2026-01-12\nnotes:\n  - \"[[Ismark]]\"\n---\nBody\n"
+    meta = fm.load(text)
+    assert meta["born"] == "1021-15-40"
+    assert meta["notes"] == ["[[Ismark]]"]
+    assert fm.spent_value(meta["spent"]) == "2026-01-12"
+    assert fm.load_lenient(text) == meta
+    # And Command still writes its own keys in such a note.
+    assert "spent: 2026-02-01" in fm.set_key(text, "spent", date(2026, 2, 1))
+
+
+def test_a_read_raises_nothing_but_its_own_error(monkeypatch):
+    def broken(*args, **kwargs):
+        raise RecursionError("too deep")
+
+    monkeypatch.setattr(fm.yaml, "safe_load", broken)
+    monkeypatch.setattr(fm.yaml, "load", broken)
+    with pytest.raises(fm.FrontmatterError, match="can't be read"):
+        fm.load("---\na: 1\n---\n")
+    assert fm.load_lenient("---\na: 1\n---\n") == {}
+
+
 @pytest.mark.parametrize("entry, target", [
     ("[[Ismark]]", "Ismark"),
     ("[[Ismark|the son]]", "Ismark"),

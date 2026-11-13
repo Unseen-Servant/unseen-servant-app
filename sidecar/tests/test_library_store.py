@@ -169,6 +169,32 @@ def test_rename_document_moves_the_book_and_keeps_ids(store):
     assert not store.rename_document("/lib/missing.pdf", "/lib/x.pdf")
 
 
+def test_a_book_indexed_where_a_renamed_book_was_keeps_its_own_parents(store):
+    """A parent id hashes the path, and a renamed book keeps the ids of its
+    old path: a new edition dropped at that path came with the same ids,
+    and the write died on the parents key."""
+    _index(store, "/lib/rules.pdf", ["first edition"], [_axis(0)])
+    store.rename_document("/lib/rules.pdf", "/lib/rules (old).pdf")
+    old_pid = "/lib/rules.pdf#p0"
+
+    for text in ("second edition", "second edition, corrected"):
+        _index(store, "/lib/rules.pdf", [text], [_axis(1)])
+        assert _rows(store, "parents") == 2
+        (old_uid, _), = store.knn(_axis(0), k=1)
+        (new_uid, _), = store.knn(_axis(1), k=1)
+        units = store.hydrate([old_uid, new_uid])
+        assert units[old_uid].source == "/lib/rules (old).pdf"
+        assert units[old_uid].parent_id == old_pid
+        # The new book's units point at a parent of its own.
+        new_pid = units[new_uid].parent_id
+        assert new_pid != old_pid
+        owner = store.conn().execute(
+            "SELECT d.path FROM parents p JOIN documents d ON d.id = p.document_id "
+            "WHERE p.parent_id = ?", (new_pid,),
+        ).fetchone()
+        assert owner == ("/lib/rules.pdf",)
+
+
 def test_rename_folder_rewrites_only_the_prefix(store):
     _index(store, "/lib/b/one.pdf", ["a"], [_axis(0)])
     _index(store, "/lib/b/deep/two.pdf", ["b"], [_axis(1)])

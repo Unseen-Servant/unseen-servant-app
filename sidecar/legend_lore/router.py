@@ -5,6 +5,7 @@ Legend Lore's HTTP routes, mounted by ``sidecar/server.py``.
 import json
 import os
 import threading
+import traceback
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -35,6 +36,7 @@ from .service import (
     file_content_hash,
     get_merged_systems,
     index_single_pdf,
+    kept_systems,
     IndexFilesRequest,
     IndexManifest,
     IndexStatusRequest,
@@ -141,6 +143,7 @@ def build_router(
             chunk_count, error, detected_system, detected_systems = index_single_pdf(
                 pdf_path, library, embed_fn, game_system=request.game_system,
                 known_systems=_merged["known"],
+                keep_systems=kept_systems(manifest.files.get(pdf_path_str)) if manifest else None,
             )
 
             if error:
@@ -187,22 +190,22 @@ def build_router(
                     status_code=404, detail=f"File not found: {request.path}"
                 )
 
+            manifest = load_manifest(data_dir) if data_dir else None
             # Atomic: index_single_pdf writes the book in one transaction
             # after embedding succeeds. The old index remains on failure so
             # search keeps working.
             chunk_count, error, detected_system, detected_systems = index_single_pdf(
                 pdf_path, library, embed_fn, game_system=request.game_system,
                 known_systems=_merged["known"],
+                keep_systems=kept_systems(manifest.files.get(request.path)) if manifest else None,
             )
 
             if error:
-                if data_dir:
-                    manifest = load_manifest(data_dir)
+                if manifest:
                     _mark_manifest_error(manifest, data_dir, request.path, error)
                 return {"chunks": 0, "game_system": detected_system, "error": error}
 
-            if data_dir:
-                manifest = load_manifest(data_dir)
+            if manifest:
                 manifest.files[request.path] = ManifestEntry(
                     filename=pdf_path.name,
                     mtime=os.path.getmtime(pdf_path),
@@ -347,132 +350,108 @@ def build_router(
             except Exception as e:
                 embed_problem = str(e)
 
-        # Phase 2: Index new files
-        for entry in diff["to_add"]:
-            pdf_path = Path(entry["path"])
+        def _index_book(entry: dict, phase: str):
+            """Index one book of an add or an update, yielding its progress.
+            Returns whether it was indexed.
+
+            Whatever goes wrong with a book stays with it: the error is
+            recorded and the sync moves on, so one PDF that the extractor,
+            the page labels or the store chokes on can't end the stream
+            before its ``complete`` event, nor stop every later sync at the
+            same file. Nothing is written for a book that fails; an update
+            keeps its previous index, with ``last_error`` set on its
+            manifest entry, and the next sync tries again.
+            """
+            nonlocal files_done, chunks_total
+            path_str = entry["path"]
+            pdf_path = Path(path_str)
+
+            def progress(**book):
+                return {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": phase, **book}
+
+            def failed(message: str):
+                nonlocal files_done
+                errors.append(message)
+                files_done += 1
+                # A no-op for an add, which has no entry to keep.
+                _mark_manifest_error(manifest, data_dir, path_str, message)
+                return progress()
+
             # Announce the book before extraction, which can run for minutes
             # on a dense rulebook — otherwise the status bar keeps naming the
             # previous book the whole time.
-            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+            yield progress()
             if embed_problem:
-                errors.append(f"{pdf_path.name}: {embed_problem}")
-                files_done += 1
-                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
-                continue
-            override = (
-                request.game_system_overrides.get(entry["path"])
-                if request.game_system_overrides else None
-            )
-            chunks, detected_system, detected_systems, error = prepare_pdf(
-                pdf_path, game_system=override,
-                known_systems=_merged["known"],
-            )
-            if error:
-                errors.append(error)
-                unindexable_paths.append(entry["path"])
-                files_done += 1
-                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
-                continue
-
-            embed_units, parents = build_granularity(chunks)
-            # Per-book counts drive the status bar's meter: chunks_total runs
-            # across the whole sync, so it can't say how far into this book.
-            book_done = 0
+                yield failed(f"{pdf_path.name}: {embed_problem}")
+                return False
             try:
+                override = (
+                    request.game_system_overrides.get(path_str)
+                    if request.game_system_overrides else None
+                )
+                chunks, detected_system, detected_systems, error = prepare_pdf(
+                    pdf_path, game_system=override,
+                    known_systems=_merged["known"],
+                )
+                if error:
+                    if phase == "add":
+                        unindexable_paths.append(path_str)
+                    yield failed(error)
+                    return False
+                # A book indexed before keeps the tags it has (the GM's own
+                # among them): detection is for a book with none.
+                kept = None if override else kept_systems(manifest.files.get(path_str))
+                if kept:
+                    detected_system, detected_systems = kept
+
+                embed_units, parents = build_granularity(chunks)
+                # Per-book counts drive the status bar's meter: chunks_total
+                # runs across the whole sync, so it can't say how far into
+                # this book.
+                book_done = 0
+                # Atomic — the book's rows are replaced in one transaction
+                # after embedding.
                 for n in _atomic_index_pdf(
                     pdf_path, detected_system, detected_systems, embed_units,
                     parents, library, embed_fn, page_labels=_page_labels(pdf_path),
                 ):
                     chunks_total += n
                     book_done += n
-                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add", "book_chunks_done": book_done, "book_chunks_total": len(embed_units)}
+                    yield progress(book_chunks_done=book_done, book_chunks_total=len(embed_units))
+
+                manifest.files[path_str] = ManifestEntry(
+                    filename=pdf_path.name,
+                    mtime=os.path.getmtime(pdf_path),
+                    chunk_count=len(embed_units),
+                    indexed_at=datetime.now(timezone.utc).isoformat(),
+                    game_system=detected_system,
+                    game_systems=detected_systems,
+                    content_hash=file_content_hash(pdf_path),
+                    file_size=os.path.getsize(pdf_path),
+                    pipeline_version=PIPELINE_VERSION,
+                )
+                save_manifest(data_dir, manifest)
             except EmbedBatchError as e:
-                # Nothing was written for this book. No prior manifest entry
-                # exists for an add; just record the error so the user sees
-                # it. Next sync will retry.
-                err_msg = str(e)
-                errors.append(err_msg)
-                files_done += 1
-                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
-                continue
-
-            added += 1
+                yield failed(str(e))
+                return False
+            except Exception as e:
+                # Not a failure this code expects: keep the trace for the log.
+                traceback.print_exc()
+                yield failed(f"{pdf_path.name}: {e}")
+                return False
             files_done += 1
-            manifest.files[entry["path"]] = ManifestEntry(
-                filename=pdf_path.name,
-                mtime=os.path.getmtime(pdf_path),
-                chunk_count=len(embed_units),
-                indexed_at=datetime.now(timezone.utc).isoformat(),
-                game_system=detected_system,
-                game_systems=detected_systems,
-                content_hash=file_content_hash(pdf_path),
-                file_size=os.path.getsize(pdf_path),
-                pipeline_version=PIPELINE_VERSION,
-            )
-            save_manifest(data_dir, manifest)
-            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "add"}
+            yield progress()
+            return True
 
-        # Phase 3: Re-index modified files. Atomic — the book's rows are
-        # replaced in one transaction after embedding. On failure, the
-        # previous successful manifest entry is preserved with last_error set.
+        # Phase 2: Index new files
+        for entry in diff["to_add"]:
+            if (yield from _index_book(entry, "add")):
+                added += 1
+
+        # Phase 3: Re-index modified files
         for entry in diff["to_update"]:
-            pdf_path = Path(entry["path"])
-            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
-            if embed_problem:
-                err_msg = f"{pdf_path.name}: {embed_problem}"
-                errors.append(err_msg)
-                files_done += 1
-                _mark_manifest_error(manifest, data_dir, entry["path"], err_msg)
-                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
-                continue
-            override = (
-                request.game_system_overrides.get(entry["path"])
-                if request.game_system_overrides else None
-            )
-            chunks, detected_system, detected_systems, error = prepare_pdf(
-                pdf_path, game_system=override,
-                known_systems=_merged["known"],
-            )
-            if error:
-                errors.append(error)
-                files_done += 1
-                _mark_manifest_error(manifest, data_dir, entry["path"], error)
-                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
-                continue
-
-            embed_units, parents = build_granularity(chunks)
-            book_done = 0
-            try:
-                for n in _atomic_index_pdf(
-                    pdf_path, detected_system, detected_systems, embed_units,
-                    parents, library, embed_fn, page_labels=_page_labels(pdf_path),
-                ):
-                    chunks_total += n
-                    book_done += n
-                    yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update", "book_chunks_done": book_done, "book_chunks_total": len(embed_units)}
-            except EmbedBatchError as e:
-                err_msg = str(e)
-                errors.append(err_msg)
-                files_done += 1
-                _mark_manifest_error(manifest, data_dir, entry["path"], err_msg)
-                yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
-                continue
-
-            updated += 1
-            files_done += 1
-            manifest.files[entry["path"]] = ManifestEntry(
-                filename=pdf_path.name,
-                mtime=os.path.getmtime(pdf_path),
-                chunk_count=len(embed_units),
-                indexed_at=datetime.now(timezone.utc).isoformat(),
-                game_system=detected_system,
-                game_systems=detected_systems,
-                content_hash=file_content_hash(pdf_path),
-                file_size=os.path.getsize(pdf_path),
-                pipeline_version=PIPELINE_VERSION,
-            )
-            save_manifest(data_dir, manifest)
-            yield {"event": "progress", "files_done": files_done, "total_files": total_files, "chunks_total": chunks_total, "current_file": pdf_path.name, "phase": "update"}
+            if (yield from _index_book(entry, "update")):
+                updated += 1
 
         # Update collections that reference renamed or auto-removed paths
         if renamed > 0 or auto_removed > 0:

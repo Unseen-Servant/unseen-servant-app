@@ -1,6 +1,8 @@
 """Frontmatter: reading every key, writing only Command's own (design §3.4).
 
-Reading parses the YAML block with PyYAML's safe loader. Writing never
+Reading parses the YAML block with PyYAML's safe loader, and whatever a
+block does to the loader stays that note's: the only thing a read raises is
+FrontmatterError. Writing never
 re-serialises the block: it replaces the lines of one top-level key and
 leaves every other byte — other keys, comments, quoting, the fences, the
 body — as it was. Each write is parsed back before it's accepted: the key
@@ -25,6 +27,18 @@ _CLOSE = re.compile(r"(?:---|\.\.\.)[ \t]*(?:\r?\n|\Z)")
 
 class FrontmatterError(Invalid):
     pass
+
+
+class _DatesAsText(yaml.SafeLoader):
+    """The safe loader without its date reading, for a block the safe
+    loader gives up on: `born: 1021-15-40` is shaped like a date, isn't one,
+    and makes it raise. Obsidian shows such a value as text."""
+
+
+_DatesAsText.yaml_implicit_resolvers = {
+    first: [(tag, pattern) for tag, pattern in resolvers if tag != "tag:yaml.org,2002:timestamp"]
+    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
 
 
 @dataclass
@@ -63,6 +77,13 @@ def _parse(block: str | None) -> dict:
         data = yaml.safe_load(block)
     except yaml.YAMLError as e:
         raise FrontmatterError(f"The frontmatter isn't valid YAML: {e}") from None
+    except Exception:
+        # Valid YAML with a value the loader can't build. Every campaign
+        # read comes through here, so nothing else may get out.
+        try:
+            data = yaml.load(block, Loader=_DatesAsText)
+        except Exception as e:
+            raise FrontmatterError(f"The frontmatter can't be read: {e}") from None
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -196,6 +217,14 @@ def _expected(value):
     return value
 
 
+def _reads_as(got, want) -> bool:
+    """Whether the value read back is the one written. A date reads back as
+    its text in a block read with dates as text (`_DatesAsText`)."""
+    if isinstance(want, date):
+        return date_value(got) == want.isoformat()
+    return got == want
+
+
 def set_key(text: str, key: str, value) -> str:
     """`text` with top-level `key` set to `value` (a date, a whole number, a
     string or a list of strings), or removed when `value` is None. Only that key's lines
@@ -227,7 +256,7 @@ def set_key(text: str, key: str, value) -> str:
     after = load(result)
     others_before = {k: v for k, v in before.items() if k != key}
     others_after = {k: v for k, v in after.items() if k != key}
-    written_ok = (key not in after) if value is None else (after.get(key) == _expected(value))
+    written_ok = (key not in after) if value is None else _reads_as(after.get(key), _expected(value))
     if not written_ok or others_before != others_after:
         raise FrontmatterError(
             f"Couldn't write {key!r} without disturbing the rest of the frontmatter "

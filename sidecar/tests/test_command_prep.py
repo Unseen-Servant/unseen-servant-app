@@ -88,6 +88,26 @@ def test_index_survives_a_note_with_broken_frontmatter(camp):
     assert any(n["name"] == "Broken" for n in prep.index(camp)["notes"])
 
 
+def test_index_survives_a_date_that_is_not_one_and_keeps_the_notes_other_keys(camp):
+    """`born: 1021-15-40` made PyYAML raise ValueError, and every read of
+    the campaign with it."""
+    write(camp / "Beats" / "Ambush.md", '---\nborn: 1021-15-40\nspent: 2026-10-04\nnotes:\n  - "[[Ismark]]"\n---\n')
+    ambush = next(b for b in prep.index(camp)["beats"] if b["name"] == "Ambush")
+    assert ambush["spent"] == "2026-10-04"
+    assert ambush["notes"] == [{"link": "Ismark", "path": "NPCs/Ismark.md"}]
+
+
+def test_index_orders_a_name_with_a_digit_that_is_no_number(camp):
+    # "²".isdigit() is true, and int("²") raises.
+    write(camp / "Beats" / "Room 2².md", "")
+    write(camp / "Beats" / "Room 10.md", "")
+    write(camp / "Sessions" / "Session ².md", "")
+    index = prep.index(camp)
+    names = [b["name"] for b in index["beats"]]
+    assert names.index("Room 2²") < names.index("Room 10")
+    assert [s["name"] for s in index["sessions"]] == ["Session ²"]
+
+
 # ---------------------------------------------------------------------------
 # Membership
 # ---------------------------------------------------------------------------
