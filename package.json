@@ -33,7 +33,7 @@
     "@tauri-apps/plugin-clipboard-manager": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-store": "^2",
-    "@xyflow/svelte": "1.7.0",
+    "@xyflow/svelte": "1.7.1",
     "svelte-exmarkdown": "^5.0.2"
   },
   "devDependencies": {
